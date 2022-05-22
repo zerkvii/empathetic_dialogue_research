@@ -5,9 +5,10 @@ log/
 submission
 todo
 backup/
-
+download
 .idea
 .vscode
+parameters_names.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -12,7 +12,7 @@ from utils import make_infinite, stack_input, make_path, \
                 get_time_str, Logger, delete_file, count_parameters
 from time import time
 from indexer import Indexer
-
+from tqdm import tqdm
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -91,11 +91,12 @@ if __name__ == '__main__':
     indexer = Indexer(cfg.n_ctx)
 
     # load train, dev data
+    print('start load dataset')
     trainset, data_loader_train = load_dataset('train', indexer, batch_size)
     devset, data_loader_dev = load_dataset('dev', indexer, batch_size)
     # to avoid memory overflow
-    trainset.filter_max_len(indexer.n_ctx)
-    devset.filter_max_len(indexer.n_ctx)
+    trainset.filter_max_len(indexer.n_ctx,option='train')
+    devset.filter_max_len(indexer.n_ctx,option='test')
 
     # create and load pretrained model
     model = ELMModel(cfg, indexer.n_vocab, indexer.n_special, indexer.n_ctx, indexer,
@@ -142,7 +143,7 @@ if __name__ == '__main__':
 
         start_time = time()
         logger.log('Start time: %s' % get_time_str())
-        for i_iter in np.arange(1, n_iter+1):
+        for i_iter in tqdm(np.arange(1, n_iter+1)):
             batch = next(tr_iter)
             model.train()
             # compute loss

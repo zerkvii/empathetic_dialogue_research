@@ -2,7 +2,9 @@ import torch
 import torch.utils.data as data
 import numpy as np
 from configs import EMOTION_CATES
-
+from tqdm import tqdm
+import pickle
+import os
 
 class Dataset(data.Dataset):
     def __init__(self, data, indexer, test=False):
@@ -50,12 +52,20 @@ class Dataset(data.Dataset):
             item['dialog_state'] = torch.tensor(item['context_state'] + item['target_state'], dtype=torch.long)
         return item
 
-    def filter_max_len(self, max_len):
+    def filter_max_len(self, max_len,option):
         size = len(self.contexts)
-        filtered = []
-        for i in range(size):
-            if self[i]['dialog'].shape[0] <= max_len:
-                filtered.append(i)
+        #load pickle if exist
+        pickle_file=f'filtered_{option}.pickle'
+        filtered=[]
+        if os.path.isfile(pickle_file):
+            with open(pickle_file,'rb') as f:
+                filtered=pickle.load(f)
+        else:
+            for i in tqdm(range(size)):
+                if self[i]['dialog'].shape[0] <= max_len:
+                    filtered.append(i)
+            with open(pickle_file,'wb') as f:
+                pickle.dump(filtered,f)
         self.contexts = self.contexts[filtered]
         self.targets = self.targets[filtered]
         self.emotions = self.emotions[filtered]
