@@ -1,6 +1,10 @@
+from copyreg import pickle
 import torch
 import torch.utils.data as data
 import numpy as np
+from tqdm import tqdm
+import pickle
+import os
 
 
 class Dataset(data.Dataset):
@@ -23,38 +27,56 @@ class Dataset(data.Dataset):
         item = {}
         item['emotion'] = self.emotions[idx]
 
-        item['context_text'] = self.contexts[idx]  # dialog utterance list [ str1, str2, ... ]
-        encoded_context = self.indexer.encode_text(item['context_text'])  # list [ [wordIdx, ...], ... ]
+        # dialog utterance list [ str1, str2, ... ]
+        item['context_text'] = self.contexts[idx]
+        encoded_context = self.indexer.encode_text(
+            item['context_text'])  # list [ [wordIdx, ...], ... ]
         context = []
         context_state = []
         for i, c in enumerate(encoded_context):
-            context += [self.indexer.SOS_IDX] + c + [self.indexer.EOS_IDX]  # add EOS symbol to every sentence's end
+            # add EOS symbol to every sentence's end
+            context += [self.indexer.SOS_IDX] + c + [self.indexer.EOS_IDX]
             ds = self.indexer.DS_SPEAKER_IDX if i % 2 == 0 else self.indexer.DS_LISTENER_IDX
             context_state += [ds for _ in range(len(c) + 2)]
         item['context'] = context
         item['context_state'] = context_state
 
         item['target_text'] = self.targets[idx]  # (str) response
-        encoded_target = self.indexer.encode_text([item['target_text']])[0]  # list [wordIdx,...]
-        target = [self.indexer.SOS_IDX] + encoded_target + [self.indexer.EOS_IDX]  # add EOS symbol to every sentence's end
-        ds = self.indexer.DS_SPEAKER_IDX if len(encoded_context) % 2 == 0 else self.indexer.DS_LISTENER_IDX
+        encoded_target = self.indexer.encode_text([item['target_text']])[
+            0]  # list [wordIdx,...]
+        target = [self.indexer.SOS_IDX] + encoded_target + \
+            [self.indexer.EOS_IDX]  # add EOS symbol to every sentence's end
+        ds = self.indexer.DS_SPEAKER_IDX if len(
+            encoded_context) % 2 == 0 else self.indexer.DS_LISTENER_IDX
         item['target'] = target
         item['target_state'] = [ds for _ in range(len(target))]
 
         if self.test:
             item['dialog'] = torch.tensor(item['context'], dtype=torch.long)
-            item['dialog_state'] = torch.tensor(item['context_state'], dtype=torch.long)
+            item['dialog_state'] = torch.tensor(
+                item['context_state'], dtype=torch.long)
         else:
-            item['dialog'] = torch.tensor(item['context'] + item['target'], dtype=torch.long)
-            item['dialog_state'] = torch.tensor(item['context_state'] + item['target_state'], dtype=torch.long)
+            item['dialog'] = torch.tensor(
+                item['context'] + item['target'], dtype=torch.long)
+            item['dialog_state'] = torch.tensor(
+                item['context_state'] + item['target_state'], dtype=torch.long)
         return item
 
-    def filter_max_len(self, max_len):
-        size = len(self.contexts)
+    def filter_max_len(self, max_len, option):
+        pickle_file = f'filtered_{option}.pickle'
+
         filtered = []
-        for i in range(size):
-            if self[i]['dialog'].shape[0] <= max_len:
-                filtered.append(i)
+        if os.path.isfile(pickle_file):
+            with open(pickle_file, 'rb') as f:
+                filtered = pickle.load(f)
+        else:
+            size = len(self.contexts)
+            for i in tqdm(range(size)):
+                if self[i]['dialog'].shape[0] <= max_len:
+                    filtered.append(i)
+
+            with open(pickle_file, 'wb') as f:
+                pickle.dump(filtered, f)
         self.contexts = self.contexts[filtered]
         self.targets = self.targets[filtered]
         self.emotions = self.emotions[filtered]
@@ -97,16 +119,19 @@ def collate_fn(data, padding_idx):
 
 def get_data_loader(dataset, batch_size, shuffle=True):
     return torch.utils.data.DataLoader(dataset=dataset,
-                                      batch_size=batch_size,
-                                      shuffle=shuffle,
-                                      collate_fn=lambda data: collate_fn(data, dataset.indexer.PAD_IDX))
+                                       batch_size=batch_size,
+                                       shuffle=shuffle,
+                                       collate_fn=lambda data: collate_fn(data, dataset.indexer.PAD_IDX))
 
 
 def load_dataset(dataset, indexer, batch_size, test=False, shuffle=True):
     d = {}
-    d['context'] = np.load('empdial_dataset/sys_dialog_texts.%s.npy' % dataset, allow_pickle=True)
-    d['target'] = np.load('empdial_dataset/sys_target_texts.%s.npy' % dataset, allow_pickle=True)
-    d['emotion'] = np.load('empdial_dataset/sys_emotion_texts.%s.npy' % dataset, allow_pickle=True)
+    d['context'] = np.load(
+        'empdial_dataset/sys_dialog_texts.%s.npy' % dataset, allow_pickle=True)
+    d['target'] = np.load(
+        'empdial_dataset/sys_target_texts.%s.npy' % dataset, allow_pickle=True)
+    d['emotion'] = np.load(
+        'empdial_dataset/sys_emotion_texts.%s.npy' % dataset, allow_pickle=True)
     dataset = Dataset(d, indexer, test=test)
     data_loader = get_data_loader(dataset, batch_size, shuffle)
     return dataset, data_loader

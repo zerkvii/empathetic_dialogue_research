@@ -88,8 +88,8 @@ if __name__ == '__main__':
     trainset, data_loader_train = load_dataset('train', indexer, batch_size)
     devset, data_loader_dev = load_dataset('dev', indexer, batch_size)
     # to avoid memory overflow
-    trainset.filter_max_len(indexer.n_ctx)
-    devset.filter_max_len(indexer.n_ctx)
+    trainset.filter_max_len(indexer.n_ctx,option)
+    devset.filter_max_len(indexer.n_ctx,option)
 
     # create and load pretrained model
     model = LMModel(cfg, indexer.n_vocab, indexer.n_special, indexer.n_ctx)
