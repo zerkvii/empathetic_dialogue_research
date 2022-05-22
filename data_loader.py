@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm
 import pickle
 import os
+from torch.utils.data.distributed import DistributedSampler
 
 
 class Dataset(data.Dataset):
@@ -117,7 +118,7 @@ def collate_fn(data, padding_idx):
     return b
 
 
-def get_data_loader(dataset, batch_size, shuffle=True):
+def get_data_loader(dataset, batch_size,shuffle=True):
     return torch.utils.data.DataLoader(dataset=dataset,
                                        batch_size=batch_size,
                                        shuffle=shuffle,
@@ -135,3 +136,21 @@ def load_dataset(dataset, indexer, batch_size, test=False, shuffle=True):
     dataset = Dataset(d, indexer, test=test)
     data_loader = get_data_loader(dataset, batch_size, shuffle)
     return dataset, data_loader
+
+
+def load_dataset_ddp(dataset, indexer, batch_size, test=False, shuffle=True):
+    d = {}
+    d['context'] = np.load(
+        'empdial_dataset/sys_dialog_texts.%s.npy' % dataset, allow_pickle=True)
+    d['target'] = np.load(
+        'empdial_dataset/sys_target_texts.%s.npy' % dataset, allow_pickle=True)
+    d['emotion'] = np.load(
+        'empdial_dataset/sys_emotion_texts.%s.npy' % dataset, allow_pickle=True)
+    dataset = Dataset(d, indexer, test=test)
+    sampler=DistributedSampler(dataset)
+    data_loader=torch.utils.data.DataLoader(dataset=dataset,
+                                       sampler=sampler,
+                                       batch_size=batch_size,
+                                       shuffle=shuffle,
+                                       collate_fn=lambda data: collate_fn(data, dataset.indexer.PAD_IDX))
+    return dataset,data_loader

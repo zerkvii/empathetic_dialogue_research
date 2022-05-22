@@ -6,6 +6,8 @@ import sys
 import re
 import subprocess
 import tempfile
+from typing import Tuple
+import GPUtil
 
 
 ########### common utils ###########
@@ -131,3 +133,22 @@ def moses_multi_bleu(hypotheses, references, lowercase=True):
     hypothesis_file.close()
     reference_file.close()
     return bleu_score
+
+
+def get_available_gpu() -> Tuple[int, str]:
+    """return a tuple
+
+    Returns
+    -------
+    Tuple[int,str]
+        return tuple
+    """
+    device_ids = GPUtil.getAvailable(
+        order='first',
+        limit=8,
+        maxLoad=0.3,
+        maxMemory=0.3,
+        includeNan=False,
+        excludeID=[],
+        excludeUUID=[])
+    return len(device_ids), ','.join([str(i) for i in device_ids])
