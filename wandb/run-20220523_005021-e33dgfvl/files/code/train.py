@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 from optimizer import OpenAIAdam
 from configs import DEFAULT_MODEL_CFG, DEFAULT_OPT_CFG
 from model import LMModel, load_openai_pretrained_model
-from data_loader import load_dataset, load_dataset_ddp
+from data_loader import load_dataset_ddp
 from utils import dotdict, make_infinite, stack_input, make_path, \
     get_time_str, Logger, delete_file, count_parameters, get_available_gpu
 from time import time
@@ -29,7 +29,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class AFModel(LightningModule):
     def __init__(self, model_name,indexer:Indexer,
-                 cfg,
+                 cfg:dotdict,
                  n_iter: int = 888,
                  hidden_size: int = 768,
                  embed_size: int = 50007,
@@ -45,10 +45,9 @@ class AFModel(LightningModule):
                  batch_size: int = 64,
                  max_length: int = 128) -> None:
         super().__init__()
+        self.save_hyperparameters()
         self.indexer=indexer
         self.n_iter = n_iter
-
-        # self.save_hyperparameters(ignore=['indexer'])
         self.model = LMModel(cfg, self.indexer.n_vocab, self.indexer.n_special, self.indexer.n_ctx)
 
     def compute_batch_loss(self, batch):
@@ -153,25 +152,25 @@ if __name__ == '__main__':
     indexer = Indexer(cfg.n_ctx)
 
     # set wandb logger
-    # wandb_logger = WandbLogger(project='empathetic_dialogue',
-    #                            config={
-    #                                "epochs": args.n_epoch,
-    #                                "batch_size": args.n_batch,
-    #                                "lr": DEFAULT_OPT_CFG.lr,
-    #                                "schedule": DEFAULT_OPT_CFG.lr_schedule,
-    #                                "warmup": DEFAULT_OPT_CFG.lr_warmup,
-    #                                "b1": DEFAULT_OPT_CFG.b1,
-    #                                "b2": DEFAULT_OPT_CFG.b2,
-    #                                "e": DEFAULT_OPT_CFG.e,
-    #                                "l2": DEFAULT_OPT_CFG.l2,
-    #                                "vector_l2": DEFAULT_OPT_CFG.vector_l2,
-    #                                "max_grad_norm": DEFAULT_OPT_CFG.max_grad_norm,
-    #                                "n_ctx":cfg.n_ctx
-    #                            })
+    wandb_logger = WandbLogger(project='empathetic_dialogue',
+                               config={
+                                   "epochs": args.n_epoch,
+                                   "batch_size": args.n_batch,
+                                   "lr": DEFAULT_OPT_CFG.lr,
+                                   "schedule": DEFAULT_OPT_CFG.lr_schedule,
+                                   "warmup": DEFAULT_OPT_CFG.lr_warmup,
+                                   "b1": DEFAULT_OPT_CFG.b1,
+                                   "b2": DEFAULT_OPT_CFG.b2,
+                                   "e": DEFAULT_OPT_CFG.e,
+                                   "l2": DEFAULT_OPT_CFG.l2,
+                                   "vector_l2": DEFAULT_OPT_CFG.vector_l2,
+                                   "max_grad_norm": DEFAULT_OPT_CFG.max_grad_norm,
+                                   "n_ctx":cfg.n_ctx
+                               })
     # load train, dev data
-    trainset, data_loader_train = load_dataset(
+    trainset, data_loader_train = load_dataset_ddp(
         'train', indexer, batch_size)
-    devset, data_loader_dev = load_dataset('dev', indexer, batch_size)
+    devset, data_loader_dev = load_dataset_ddp('dev', indexer, batch_size)
     # to avoid memory overflow
     trainset.filter_max_len(indexer.n_ctx, 'train')
     devset.filter_max_len(indexer.n_ctx, 'dev')
@@ -203,18 +202,18 @@ if __name__ == '__main__':
     trainer = Trainer(max_epochs=n_epoch,
                       accelerator="gpu",
                       devices=available_devices,
-                      strategy='ddp',
+                      strategy='bagua',
                       callbacks=[checkpoint_callback]
                       )
-    if args.dev:
+    if args.is_dev:
         trainer = Trainer(max_epochs=5,
                           accelerator="gpu",
                           devices=1,
                           )
-    if not args.test:
+    if not args.is_test:
         trainer.fit(model=model, train_dataloaders=data_loader_train, val_dataloaders=data_loader_dev)
     
-    if args.test:
+    if args.is_test:
         version_num=0
         checkpoints_file=f'./lightning_logs/version_{version_num}/checkpoints/adde_model.ckpt'
         model.load_from_checkpoint(checkpoints_file)

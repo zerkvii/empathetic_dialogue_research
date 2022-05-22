@@ -74,8 +74,8 @@ def stack_input(X, states, indexer):
     # position encoding
     t = indexer.n_vocab + indexer.n_special
     pos_enc = np.arange(t, t + X.shape[-1])
-    pos_enc = torch.from_numpy(pos_enc)
-    pos_enc_ext = torch.empty(X.shape, dtype=torch.long)
+    pos_enc = torch.from_numpy(pos_enc).to('cuda')
+    pos_enc_ext = torch.empty(X.shape, dtype=torch.long).to('cuda')
     for i in np.arange(X.shape[0]):
         pos_enc_ext[i] = pos_enc
     batch = torch.stack([X, pos_enc_ext], dim=-1)

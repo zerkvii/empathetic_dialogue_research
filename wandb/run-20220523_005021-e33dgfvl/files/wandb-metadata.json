@@ -1,0 +1,24 @@
+{
+    "os": "Linux-5.13.0-41-generic-x86_64-with-glibc2.31",
+    "python": "3.9.12",
+    "heartbeatAt": "2022-05-22T16:50:24.405538",
+    "startedAt": "2022-05-22T16:50:21.979641",
+    "docker": null,
+    "gpu": "NVIDIA GeForce RTX 3090",
+    "gpu_count": 2,
+    "cpu_count": 16,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/gaojunting/baselines/AFF-DECODE/train.py",
+    "codePath": "train.py",
+    "git": {
+        "remote": "https://github.com/zenggo/affective-decoding-4-empathetic-dialog.git",
+        "commit": "dcd11226db4ffb57a6d226e908ce5736032c6ac1"
+    },
+    "email": "741884196@qq.com",
+    "root": "/home/gaojunting/baselines/AFF-DECODE",
+    "host": "C402-Server-11",
+    "username": "gaojunting",
+    "executable": "/home/gaojunting/anaconda3/envs/nlp_env/bin/python"
+}

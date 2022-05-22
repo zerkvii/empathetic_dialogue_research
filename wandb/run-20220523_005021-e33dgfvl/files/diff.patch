@@ -1,0 +1,12 @@
+diff --git a/train.py b/train.py
+index 76252f6..1111cfa 100644
+--- a/train.py
++++ b/train.py
+@@ -112,7 +112,6 @@ def parse_args():
+     parser.add_argument('--log_file', type=str, default='train.output')
+     parser.add_argument('--save_path', type=str, default='save/best_params')
+     parser.add_argument('--print_to', type=str, default='file')
+-    parser.add_argument('--seed', type=int, default=42)
+     parser.add_argument('--dev', type=bool, default=True)
+     parser.add_argument('--test', type=bool, default=False)
+     parser.add_argument('--seed', type=int, default=42)
