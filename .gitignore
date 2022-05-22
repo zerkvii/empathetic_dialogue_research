@@ -5,9 +5,12 @@ log/
 submission
 todo
 backup/
+
 wandb/
 wandb
 wandb/*
+wandb/**
+
 .idea
 .vscode
 
