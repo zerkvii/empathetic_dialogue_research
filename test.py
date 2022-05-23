@@ -10,6 +10,7 @@ from data_loader import load_dataset
 from utils import get_time_str, Logger, count_parameters, moses_multi_bleu
 from time import time
 from generator import GreedyGenerator, BeamSearchGenerator, DBSGenerator
+from generator_specemo import BeamSearchGenerator as SpecBeamSearchGenerator
 
 
 def parse_args():
@@ -70,7 +71,10 @@ if __name__ == '__main__':
 
     # different generators
     # gen_greedy = GreedyGenerator(model, args.max_gen_len, indexer, device)
-    gen_BS = BeamSearchGenerator(model, args.max_gen_len, indexer, device, args.beam_size)
+    if args.oracle:
+        gen_BS = SpecBeamSearchGenerator(model, args.max_gen_len, indexer, device, args.beam_size)
+    else:
+        gen_BS = BeamSearchGenerator(model, args.max_gen_len, indexer, device, args.beam_size)
     # gen_DBS = DBSGenerator(model, args.max_gen_len, indexer, device, args.dbs_beam_size, args.dbs_groups, args.dbs_lambda)
 
     #################### test ####################

@@ -11,7 +11,8 @@ DEFAULT_MODEL_CFG = dotdict({
     'attn_pdrop': 0.1,
     'resid_pdrop': 0.1,
     'clf_pdrop': 0.1,
-    'afn': 'gelu'
+    'afn': 'gelu',
+    'clf_hs': []
 })
 
 

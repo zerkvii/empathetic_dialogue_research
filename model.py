@@ -9,6 +9,7 @@ import re
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from configs import EMOTION_CATES
 
@@ -113,6 +114,33 @@ class LMHead(nn.Module):
             h = h[:, -1:, :]
         lm_logits = self.decoder(h)
         return lm_logits[:, :, :self.n_decoding_vocab]
+
+
+class ClfHead(nn.Module):
+    def __init__(self, clf_token, cfg, n_class):
+        super(ClfHead, self).__init__()
+        self.clf_token = clf_token
+        self.dropout = nn.Dropout(cfg.clf_pdrop)
+        n_hs = [cfg.n_embd] + cfg.clf_hs + [n_class]
+        mlp = []
+        for i in range(len(n_hs)-1):
+            n_input = n_hs[i]
+            n_output = n_hs[i+1]
+            l = nn.Linear(n_input, n_output)
+            nn.init.normal_(l.weight, std=0.02)
+            nn.init.normal_(l.bias, 0)
+            mlp.append(l)
+        self.mlp = nn.ModuleList(mlp)
+
+    def forward(self, h):
+        for i in range(len(self.mlp)-1):
+            layer = self.mlp[i]
+            h = self.dropout(h)
+            h = layer(h)
+            h = F.relu(h)
+        output_layer = self.mlp[-1]
+        clf_logits = output_layer(self.dropout(h))
+        return clf_logits
 
 
 class TransformerModel(nn.Module):

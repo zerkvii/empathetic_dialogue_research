@@ -115,6 +115,7 @@ def collate_fn(data, padding_idx):
     dial_state_batch = [d['dialog_state'] for d in data]
     b['dialog'], b['dialog_length'], b['dialog_mask'] = merge(dial_batch)
     b['dialog_state'], _, _ = merge(dial_state_batch)
+    b['clf_idx'] = torch.tensor([d['clf_idx'] for d in data], dtype=torch.long)
     return b
 
 

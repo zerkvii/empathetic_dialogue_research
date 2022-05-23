@@ -9,10 +9,17 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 from optimizer import OpenAIAdam
 from configs import DEFAULT_MODEL_CFG, DEFAULT_OPT_CFG
+<<<<<<< HEAD
 from model import LMModel, load_openai_pretrained_model
 from data_loader import load_dataset, load_dataset_ddp
 from utils import dotdict, make_infinite, stack_input, make_path, \
     get_time_str, Logger, delete_file, count_parameters, get_available_gpu
+=======
+from model import ELMModel, load_openai_pretrained_model
+from data_loader import load_dataset
+from utils import make_infinite, stack_input, make_path, cal_clf_acc, \
+                get_time_str, Logger, delete_file, count_parameters
+>>>>>>> adm
 from time import time
 from indexer import Indexer
 from torch.utils.data.distributed import DistributedSampler
