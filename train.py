@@ -99,15 +99,9 @@ def parse_args():
     # training configs
     parser.add_argument('--n_epoch', type=int, default=15)
     parser.add_argument('--n_batch', type=int, default=32)
-    # parser.add_argument('--check_iter', type=int, default=1000)
-    # parser.add_argument('--print_iter', type=int, default=100)
     parser.add_argument('--max_patience', type=int, default=3)
     # other configs
-    parser.add_argument('--log_dir', type=str, default='log/')
-    parser.add_argument('--log_file', type=str, default='train.output')
-    parser.add_argument('--save_path', type=str, default='save/best_params')
-    parser.add_argument('--print_to', type=str, default='file')
-    parser.add_argument('--dev', type=bool, default=True)
+    parser.add_argument('--dev', type=bool, default=False)
     parser.add_argument('--test', type=bool, default=False)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--no_pretrained', default=False, action='store_true')
@@ -116,14 +110,6 @@ def parse_args():
     return parser.parse_args()
 
 
-# def validate(model, data):
-#     val_loss = []
-#     with torch.no_grad():
-#         model.eval()
-#         for _, batch in enumerate(data):
-#             l = compute_batch_loss(model, batch)
-#             val_loss.append(l.item())
-#     return np.mean(val_loss)
 
 
 if __name__ == '__main__':
@@ -135,9 +121,6 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
 
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # training record by tensorboardX
 
     # batch size
     batch_size = args.n_batch
@@ -147,23 +130,6 @@ if __name__ == '__main__':
     # indexer
     indexer = Indexer(model_cfg.n_ctx)
 
-    # set wandb logger
-    # wandb_logger = WandbLogger(project='empathetic_dialogue',
-    #                            config={
-    #                                "epochs": args.n_epoch,
-    #                                "batch_size": args.n_batch,
-    #                                "lr": DEFAULT_OPT_CFG.lr,
-    #                                "schedule": DEFAULT_OPT_CFG.lr_schedule,
-    #                                "warmup": DEFAULT_OPT_CFG.lr_warmup,
-    #                                "b1": DEFAULT_OPT_CFG.b1,
-    #                                "b2": DEFAULT_OPT_CFG.b2,
-    #                                "e": DEFAULT_OPT_CFG.e,
-    #                                "l2": DEFAULT_OPT_CFG.l2,
-    #                                "vector_l2": DEFAULT_OPT_CFG.vector_l2,
-    #                                "max_grad_norm": DEFAULT_OPT_CFG.max_grad_norm,
-    #                                "n_ctx":cfg.n_ctx
-    #                            })
-    # load train, dev data
     trainset, data_loader_train = load_dataset(
         'train', indexer, batch_size)
     devset, data_loader_dev = load_dataset('dev', indexer, batch_size)
@@ -191,12 +157,6 @@ if __name__ == '__main__':
 
     #################### training ####################
 
-    # best_valid_ppl = 1000000
-    # best_param_path = make_path(args.save_path)
-    # max_patience = args.max_patience
-    # patience = max_patience
-    # check_iter = args.check_iter
-    # print_iter = args.print_iter
     trainer=Trainer
     checkpoint_callback = ModelCheckpoint(
         monitor="val_ppl", filename=f"adde_model", mode="min")

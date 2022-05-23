@@ -11,7 +11,9 @@ wandb
 wandb/*
 wandb/**
 *.pickle
-
+lightning_logs/
+lightning_logs
+lightning_logs/**
 .idea
 .vscode
 
