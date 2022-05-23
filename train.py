@@ -96,6 +96,11 @@ class AFModel(LightningModule):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    # model configs
+    parser.add_argument('--beta', type=float, default=1.0)
+    parser.add_argument('--n_emo_embd', type=int, default=768)
+    parser.add_argument('--init_std', type=float, default=0.02)
+    parser.add_argument('--tieSL', default=False, action='store_true')
     # training configs
     parser.add_argument('--n_epoch', type=int, default=15)
     parser.add_argument('--n_batch', type=int, default=32)

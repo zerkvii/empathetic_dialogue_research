@@ -109,7 +109,7 @@ def collate_fn(data, padding_idx):
 
     b = {}
     b['data'] = data
-    b['emotion'] = [d['emotion'] for d in data]
+    b['emotion'] = torch.tensor([EMOTION_CATES.index(d['emotion']) for d in data], dtype=torch.long)
 
     dial_batch = [d['dialog'] for d in data]
     dial_state_batch = [d['dialog_state'] for d in data]
