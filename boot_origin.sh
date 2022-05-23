@@ -1,0 +1,1 @@
+nohup python train_origin.py --save_path save/model > train_origin.log &

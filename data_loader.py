@@ -155,6 +155,8 @@ def load_dataset_ddp(dataset, indexer, batch_size, test=False, shuffle=True):
         'empdial_dataset/sys_target_texts.%s.npy' % dataset, allow_pickle=True)
     d['emotion'] = np.load(
         'empdial_dataset/sys_emotion_texts.%s.npy' % dataset, allow_pickle=True)
+    #prepend used
+    d['pred_emotion'] = np.load('empdial_dataset/fasttest_pred_emotion_texts.%s.npy' % dataset, allow_pickle=True)
     dataset = Dataset(d, indexer, test=test)
     sampler=DistributedSampler(dataset)
     data_loader=torch.utils.data.DataLoader(dataset=dataset,

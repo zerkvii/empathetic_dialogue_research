@@ -1,5 +1,6 @@
 import fasttext
 import numpy as np
+from tqdm import tqdm
 
 ftmodel = fasttext.FastText.load_model('./save/fasttext_empathetic_dialogues.mdl')
 
@@ -9,7 +10,7 @@ d['target'] = np.load('empdial_dataset/sys_target_texts.test.npy', allow_pickle=
 d['emotion'] = np.load('empdial_dataset/sys_emotion_texts.test.npy', allow_pickle=True)
 
 preds = []
-for i in range(15):
+for i in tqdm(range(15)):
     t = " </s> ".join(d['context'][i])
     pred, _ = ftmodel.predict(t, k=1)
     pred_emo = pred[0].split('__')[-1]
