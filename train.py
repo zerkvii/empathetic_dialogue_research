@@ -23,33 +23,23 @@ from pytorch_lightning import LightningModule, seed_everything, Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 available_devices, devices = get_available_gpu()
-
+from typing import Dict
 os.environ['CUDA_VISIBLE_DEVICES'] = devices
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class AFModel(LightningModule):
-    def __init__(self, model_name,indexer:Indexer,
-                 cfg,
+    def __init__(self, model_name,
+                 indexer:Indexer,
+                 model_cfg:Dict,
+                 opt_cfg:Dict,
                  n_iter: int = 888,
-                 hidden_size: int = 768,
-                 embed_size: int = 50007,
-                 weight_decay: float = 0.0,
-                 learning_rate: float = 1e-4,
-                 adam_epsilon: float = 1e-8,
-                 train_batch_size: int = 32,
-                 eval_batch_size: int = 32,
-                 warmup_steps: int = 0,
-                 map_size: int = 512,
-                 num_classes: int = 2,
-                 dropout: float = 0.2,
-                 batch_size: int = 64,
-                 max_length: int = 128) -> None:
+                 ) -> None:
         super().__init__()
         self.indexer=indexer
-        self.n_iter = n_iter
+        self.save_hyperparameters(ignore=['indexer'])
 
         # self.save_hyperparameters(ignore=['indexer'])
-        self.model = LMModel(cfg, self.indexer.n_vocab, self.indexer.n_special, self.indexer.n_ctx)
+        self.model = LMModel(dotdict(model_cfg), self.indexer.n_vocab, self.indexer.n_special, self.indexer.n_ctx)
 
     def compute_batch_loss(self, batch):
         # stack token, dialog states and position encoding
@@ -76,26 +66,30 @@ class AFModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss = self.compute_batch_loss(batch)
-
+        self.log('train_loss',loss)
+        self.log('train_ppl',torch.exp(loss))
         return loss
 
     def validation_step(self, batch, batch_idx):
         val_loss = self.compute_batch_loss(batch)
+
+        self.log('val_loss',val_loss)
+        self.log('val_ppl',torch.exp(val_loss))
         return val_loss
 
     def configure_optimizers(self):
-
+        cfg=dotdict(self.hparams.opt_cfg)
         model_opt = OpenAIAdam(self.parameters(),
-                               t_total=self.n_iter,
-                               lr=DEFAULT_OPT_CFG.lr,
-                               schedule=DEFAULT_OPT_CFG.lr_schedule,
-                               warmup=DEFAULT_OPT_CFG.lr_warmup,
-                               b1=DEFAULT_OPT_CFG.b1,
-                               b2=DEFAULT_OPT_CFG.b2,
-                               e=DEFAULT_OPT_CFG.e,
-                               l2=DEFAULT_OPT_CFG.l2,
-                               vector_l2=DEFAULT_OPT_CFG.vector_l2,
-                               max_grad_norm=DEFAULT_OPT_CFG.max_grad_norm)
+                               t_total=self.hparams.n_iter,
+                               lr=cfg.lr,
+                               schedule=cfg.lr_schedule,
+                               warmup=cfg.lr_warmup,
+                               b1=cfg.b1,
+                               b2=cfg.b2,
+                               e=cfg.e,
+                               l2=cfg.l2,
+                               vector_l2=cfg.vector_l2,
+                               max_grad_norm=cfg.max_grad_norm)
 
         return model_opt
 
@@ -103,10 +97,10 @@ class AFModel(LightningModule):
 def parse_args():
     parser = argparse.ArgumentParser()
     # training configs
-    parser.add_argument('--n_epoch', type=int, default=3)
-    parser.add_argument('--n_batch', type=int, default=8)
-    parser.add_argument('--check_iter', type=int, default=1000)
-    parser.add_argument('--print_iter', type=int, default=100)
+    parser.add_argument('--n_epoch', type=int, default=15)
+    parser.add_argument('--n_batch', type=int, default=32)
+    # parser.add_argument('--check_iter', type=int, default=1000)
+    # parser.add_argument('--print_iter', type=int, default=100)
     parser.add_argument('--max_patience', type=int, default=3)
     # other configs
     parser.add_argument('--log_dir', type=str, default='log/')
@@ -148,9 +142,10 @@ if __name__ == '__main__':
     # batch size
     batch_size = args.n_batch
     # model configs
-    cfg = DEFAULT_MODEL_CFG
+    model_cfg = DEFAULT_MODEL_CFG
+    opt_cfg=DEFAULT_OPT_CFG
     # indexer
-    indexer = Indexer(cfg.n_ctx)
+    indexer = Indexer(model_cfg.n_ctx)
 
     # set wandb logger
     # wandb_logger = WandbLogger(project='empathetic_dialogue',
@@ -182,24 +177,29 @@ if __name__ == '__main__':
     n_iter = int(np.ceil(len(trainset) / batch_size)) * n_epoch
 
     # create and load pretrained model
-    model = AFModel(model_name='adde-lm',indexer=indexer,cfg=cfg,n_iter=n_iter)
+    model = AFModel(model_name='adde-lm',
+                    indexer=indexer,
+                    model_cfg=dict(model_cfg),
+                    opt_cfg=dict(opt_cfg),
+                    n_iter=n_iter,
+                    )
     if not args.no_pretrained:
-        load_openai_pretrained_model(model.model.transformer, cfg,
+        load_openai_pretrained_model(model.model.transformer, model_cfg,
                                      n_special=indexer.n_special,
                                      dir=args.pretrained_dir)
 
 
     #################### training ####################
 
-    best_valid_ppl = 1000000
-    best_param_path = make_path(args.save_path)
-    max_patience = args.max_patience
-    patience = max_patience
-    check_iter = args.check_iter
-    print_iter = args.print_iter
+    # best_valid_ppl = 1000000
+    # best_param_path = make_path(args.save_path)
+    # max_patience = args.max_patience
+    # patience = max_patience
+    # check_iter = args.check_iter
+    # print_iter = args.print_iter
     trainer=Trainer
     checkpoint_callback = ModelCheckpoint(
-        monitor="val_loss", filename=f"adde_model", mode="min")
+        monitor="val_ppl", filename=f"adde_model", mode="min")
     trainer = Trainer(max_epochs=n_epoch,
                       accelerator="gpu",
                       devices=available_devices,
@@ -218,73 +218,3 @@ if __name__ == '__main__':
         version_num=0
         checkpoints_file=f'./lightning_logs/version_{version_num}/checkpoints/adde_model.ckpt'
         model.load_from_checkpoint(checkpoints_file)
-        # trainer.test(model=model, dataloaders=edl)
-    # optimizer
-
-    # try:
-        # best_valid_ppl = 1000000
-        # best_param_path = make_path(args.save_path)
-        # max_patience = args.max_patience
-        # patience = max_patience
-        # check_iter = args.check_iter
-        # print_iter = args.print_iter
-
-        # logger.log('Begin training.')
-        # logger.log('total training data: %d' % len(trainset))
-        # logger.log('batch size = %d, epochs: %d, total iterations: %d ' %
-        #            (batch_size, n_epoch, n_iter))
-        # logger.log('-'*89)
-
-    #     start_time = time()
-    #     logger.log('Start time: %s' % get_time_str())
-    #     for i_iter in np.arange(1, n_iter+1):
-    #         batch = next(tr_iter)
-    #         model.train()
-    #         # compute loss
-    #         loss = compute_batch_loss(model, batch)
-    #         # update
-    #         loss.backward()
-    #         model_opt.step()
-    #         model_opt.zero_grad()
-    #         # log
-    #         perplexity = np.exp(min(loss.item(), 100))
-    #         tb_writer.add_scalars('loss', {'loss_train': loss.item()}, i_iter)
-    #         tb_writer.add_scalars('ppl', {'ppl_train': perplexity}, i_iter)
-    #         if i_iter % print_iter == 0:
-    #             tmp = i_iter % check_iter
-    #             tmp = check_iter if tmp == 0 else tmp
-    #             avg_seconds = (time() - start_time) / tmp
-    #             logger.log('iter %d, avg time per iter: %f' %
-    #                        (i_iter, avg_seconds))
-    #         # validate
-    #         if i_iter % check_iter == 0:
-    #             logger.log('-'*10+'start validation at iter %d' % i_iter)
-    #             start_time = time()
-    #             val_loss = validate(model, data_loader_dev)
-    #             val_ppl = np.exp(min(val_loss, 100))
-    #             tb_writer.add_scalars('loss', {'loss_valid': val_loss}, i_iter)
-    #             tb_writer.add_scalars('ppl', {'ppl_valid': val_ppl}, i_iter)
-    #             logger.log('loss=%f, ppl=%f' % (val_loss, val_ppl))
-    #             logger.log('-'*10+'time for validation: %f' %
-    #                        (time()-start_time))
-    #             start_time = time()
-    #             if val_ppl < best_valid_ppl:
-    #                 patience = max_patience
-    #                 best_valid_ppl = val_ppl
-    #                 # save params
-    #                 logger.log('@@ save best params at iter %d, ppl=%.2f' %
-    #                            (i_iter, val_ppl))
-    #                 delete_file(best_param_path)
-    #                 torch.save(model.state_dict(), best_param_path)
-    #             else:
-    #                 patience -= 1
-    #                 if patience == 0:
-    #                     logger.log('-' * 89)
-    #                     logger.log('Exiting from traning at iter %d' % i_iter)
-    #                     break  # break training iteration
-    # except KeyboardInterrupt:
-    #     logger.log('-' * 89)
-    #     logger.log('Exiting from training early')
-
-    # logger.log('Training end at: %s' % get_time_str())
-    # logger.close()
