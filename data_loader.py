@@ -16,6 +16,7 @@ class Dataset(data.Dataset):
         self.contexts = data['context']
         self.targets = data['target']
         self.emotions = data['emotion']
+        self.pred_emotions = data['pred_emotion']
         assert len(self.contexts) == len(self.targets) == len(self.emotions)
         self.indexer = indexer
         self.test = test
@@ -27,6 +28,7 @@ class Dataset(data.Dataset):
         """returns one data pair"""
         item = {}
         item['emotion'] = self.emotions[idx]
+        item['pred_emotion'] = self.pred_emotions[idx]
 
         # dialog utterance list [ str1, str2, ... ]
         item['context_text'] = self.contexts[idx]
@@ -39,8 +41,13 @@ class Dataset(data.Dataset):
             context += [self.indexer.SOS_IDX] + c + [self.indexer.EOS_IDX]
             ds = self.indexer.DS_SPEAKER_IDX if i % 2 == 0 else self.indexer.DS_LISTENER_IDX
             context_state += [ds for _ in range(len(c) + 2)]
-        item['context'] = context
-        item['context_state'] = context_state
+        # prepend emotion label to the context
+        if self.test:
+            encoded_emo = self.indexer.encode_text([item['pred_emotion']])[0]
+        else:
+            encoded_emo = self.indexer.encode_text([item['emotion']])[0]
+        item['context'] = encoded_emo + context
+        item['context_state'] = [self.indexer.DS_PREP_IDX for _ in encoded_emo] + context_state
 
         item['target_text'] = self.targets[idx]  # (str) response
         encoded_target = self.indexer.encode_text([item['target_text']])[
@@ -81,12 +88,14 @@ class Dataset(data.Dataset):
         self.contexts = self.contexts[filtered]
         self.targets = self.targets[filtered]
         self.emotions = self.emotions[filtered]
+        self.pred_emotions = self.pred_emotions[filtered]
         return filtered
 
     def filter_by_idxs(self, idxs):
         self.contexts = self.contexts[idxs]
         self.targets = self.targets[idxs]
         self.emotions = self.emotions[idxs]
+        self.pred_emotions = self.pred_emotions[idxs]
 
 
 def collate_fn(data, padding_idx):
@@ -109,13 +118,12 @@ def collate_fn(data, padding_idx):
 
     b = {}
     b['data'] = data
-    b['emotion'] = torch.tensor([EMOTION_CATES.index(d['emotion']) for d in data], dtype=torch.long)
+    b['emotion'] = [d['emotion'] for d in data]
 
     dial_batch = [d['dialog'] for d in data]
     dial_state_batch = [d['dialog_state'] for d in data]
     b['dialog'], b['dialog_length'], b['dialog_mask'] = merge(dial_batch)
     b['dialog_state'], _, _ = merge(dial_state_batch)
-    b['clf_idx'] = torch.tensor([d['clf_idx'] for d in data], dtype=torch.long)
     return b
 
 
