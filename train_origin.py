@@ -6,13 +6,13 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 from optimizer import OpenAIAdam
 from configs import DEFAULT_MODEL_CFG, DEFAULT_OPT_CFG
-from model import ELMModel, load_openai_pretrained_model
+from model import ELMModel, load_openai_pretrained_model,LMModel
 from data_loader import load_dataset
 from utils import make_infinite, stack_input, make_path, \
                 get_time_str, Logger, delete_file, count_parameters
 from time import time
 from indexer import Indexer
-
+from tqdm import tqdm
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -40,10 +40,12 @@ def parse_args():
 
 def compute_batch_loss(model, batch):
     # stack token, dialog states and position encoding
+    batch['dialog']=batch['dialog'].to(device)
+    batch['dialog_state']=batch['dialog_state'].to(device)
     X = stack_input(batch['dialog'], [batch['dialog_state']], indexer)
     X = X.to(device)
     # compute augmented LM logits and loss
-    logits, _ = model(batch['emotion'].to(device), X)
+    logits, _ = model(X)
     mask = batch['dialog_mask'].to(device)
     # calculate language modelling loss
     target_shifted = X[:, 1:, 0].contiguous().view(-1)
@@ -94,12 +96,14 @@ if __name__ == '__main__':
     trainset, data_loader_train = load_dataset('train', indexer, batch_size)
     devset, data_loader_dev = load_dataset('dev', indexer, batch_size)
     # to avoid memory overflow
-    trainset.filter_max_len(indexer.n_ctx)
-    devset.filter_max_len(indexer.n_ctx)
+    
+    trainset.filter_max_len(indexer.n_ctx,option='train')
+    devset.filter_max_len(indexer.n_ctx,option='dev')
 
     # create and load pretrained model
-    model = ELMModel(cfg, indexer.n_vocab, indexer.n_special, indexer.n_ctx, indexer,
-                     args.beta, args.init_std, args.tieSL)
+    model = LMModel(cfg, indexer.n_vocab, indexer.n_special, indexer.n_ctx) 
+    # model = LMModel(cfg, indexer.n_vocab, indexer.n_special, indexer.n_ctx, indexer,
+                    #  args.beta, args.init_std, args.tieSL)
     if not args.no_pretrained:
         load_openai_pretrained_model(model.transformer, cfg,
                                      n_special=indexer.n_special,
@@ -142,7 +146,7 @@ if __name__ == '__main__':
 
         start_time = time()
         logger.log('Start time: %s' % get_time_str())
-        for i_iter in np.arange(1, n_iter+1):
+        for i_iter in tqdm(np.arange(1, n_iter+1)):
             batch = next(tr_iter)
             model.train()
             # compute loss
