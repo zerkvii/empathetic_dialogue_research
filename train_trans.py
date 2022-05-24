@@ -27,7 +27,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 available_devices, devices = get_available_gpu()
 from typing import Dict
-os.environ['CUDA_VISIBLE_DEVICES'] = devices
+os.environ['CUDA_VISIBLE_DEVICES'] = '9'
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class AFModel(LightningModule):
@@ -105,12 +105,15 @@ def parse_args():
     parser.add_argument('--init_std', type=float, default=0.02)
     parser.add_argument('--tieSL', default=False, action='store_true')
     # training configs
-    parser.add_argument('--n_epoch', type=int, default=15)
-    parser.add_argument('--n_batch', type=int, default=32)
+    parser.add_argument('--n_epoch', type=int, default=3)
+    parser.add_argument('--n_batch', type=int, default=8)
     parser.add_argument('--max_patience', type=int, default=3)
+    #do not use
+    parser.add_argument('--save_path', type=str, default='save/model')
     # other configs
     parser.add_argument('--dev', type=bool, default=False)
     parser.add_argument('--test', type=bool, default=False)
+    parser.add_argument('--model', type=str, default='LMModel')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--no_pretrained', default=False, action='store_true')
     parser.add_argument('--pretrained_dir', type=str,
@@ -140,7 +143,7 @@ if __name__ == '__main__':
 
     trainset, data_loader_train = load_dataset(
         'train', indexer, batch_size)
-    devset, data_loader_dev = load_dataset('dev', indexer, batch_size)
+    devset, data_loader_dev = load_dataset('dev', indexer, batch_size,shuffle=False)
     # to avoid memory overflow
     trainset.filter_max_len(indexer.n_ctx, 'train')
     devset.filter_max_len(indexer.n_ctx, 'dev')

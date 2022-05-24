@@ -71,7 +71,7 @@ class Dataset(data.Dataset):
         return item
 
     def filter_max_len(self, max_len, option):
-        pickle_file = f'filtered_{option}.pickle'
+        pickle_file = f'./empdial_dataset/filtered_{option}.pickle'
 
         filtered = []
         if os.path.isfile(pickle_file):
@@ -142,6 +142,8 @@ def load_dataset(dataset, indexer, batch_size, test=False, shuffle=True):
         'empdial_dataset/sys_target_texts.%s.npy' % dataset, allow_pickle=True)
     d['emotion'] = np.load(
         'empdial_dataset/sys_emotion_texts.%s.npy' % dataset, allow_pickle=True)
+
+    d['pred_emotion'] = np.load('empdial_dataset/fasttest_pred_emotion_texts.%s.npy' % dataset, allow_pickle=True)
     dataset = Dataset(d, indexer, test=test)
     data_loader = get_data_loader(dataset, batch_size, shuffle)
     return dataset, data_loader
