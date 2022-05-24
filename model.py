@@ -51,6 +51,25 @@ class LMModel(nn.Module):
         lm_logits = self.lm_head(sts[-1][0], last_only)
         return lm_logits, sts
 
+class MtlELM(LMModel):
+    """ Transformer with language model head and Emphathy head """
+    def __init__(self, cfg, n_vocab, n_special, n_ctx, indexer):
+        super(MtlELM, self).__init__(cfg, n_vocab, n_special, n_ctx)
+        self.indexer = indexer
+        # emotion classifier
+        self.clf_head = ClfHead(indexer.EOS_IDX, cfg, len(EMOTION_CATES))
+
+    def forward(self, clf_idx, x, pre_sts=None, last_only=False):
+        sts = self.transformer(x, pre_sts)
+        last_hs = sts[-1][0]  # hidden states of the last layer
+        # lm
+        lm_logits = self.lm_head(last_hs, last_only)
+        device = next(self.parameters()).device
+        # predict emotion prob distribution
+        clf_sts = last_hs[torch.arange(x.shape[0]), clf_idx.to(device)]
+        clf_logits = self.clf_head(clf_sts)
+        return lm_logits, sts, clf_logits
+
 class AdmELM(LMModel):
     """ Transformer with language model head and Emphathy head """
     def __init__(self, cfg, n_vocab, n_special, n_ctx, indexer, beta=1.0, init_std=0.02, tieSL=False):

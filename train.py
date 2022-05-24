@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 from optimizer import OpenAIAdam
 from configs import DEFAULT_MODEL_CFG, DEFAULT_OPT_CFG
-from model import AdmELM, ELMModel, LMModel, load_openai_pretrained_model
+from model import AdmELM, ELMModel, LMModel, MtlELM, load_openai_pretrained_model
 from data_loader import load_dataset, load_dataset_ddp
 from utils import cal_clf_acc, dotdict, make_infinite, stack_input, make_path, \
     get_time_str, Logger, delete_file, count_parameters, get_available_gpu
@@ -67,6 +67,8 @@ class AFModel(LightningModule):
                                   init_std=init_std,
                                   tieSL=tieSL
                                   ) 
+        elif self.hparams.model_name=='mtl':
+            self.model=MtlELM(dotdict(model_cfg), indexer.n_vocab, indexer.n_special, indexer.n_ctx, indexer)
     def compute_batch_loss(self, batch):
         # stack token, dialog states and position encoding
         X = stack_input(batch['dialog'], [batch['dialog_state']], self.indexer)
@@ -76,7 +78,7 @@ class AFModel(LightningModule):
             logits, _ = self.model(X)
         elif self.hparams.model_name=='adde':
             logits,_=self.model(batch['emotion'],X)
-        elif self.hparams.model_name=='adm':
+        elif self.hparams.model_name in ['adm','mtl']:
             logits, _, clf_logits = self.model(batch['clf_idx'], X)
         # mask = batch['dialog_mask'].to(device)
         mask = batch['dialog_mask']
@@ -89,30 +91,48 @@ class AFModel(LightningModule):
         mask_shifted = mask[:, 1:]
         loss = torch.sum(loss.view(mask_shifted.shape) *
                          mask_shifted) / torch.sum(mask_shifted)
-        if self.hparams.model_name == 'adm':
+        if self.hparams.model_name in ['adm','mtl']:
             emo_label = batch['emotion']
             clf_loss = F.cross_entropy(clf_logits, emo_label, reduction='mean')
              # calculate emotion clf accuracy
             acc_top1, acc_top5 = cal_clf_acc(clf_logits, emo_label.tolist())
-            joint_loss = loss + clf_loss
-            return joint_loss
+            # joint_loss = loss  clf_loss
+            # return joint_loss
+            return loss, clf_loss, (acc_top1, acc_top5)
         return loss
 
     def forward(self, x):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
-        loss = self.compute_batch_loss(batch)
-        self.log('train_loss',loss)
-        self.log('train_ppl',torch.exp(loss))
-        return loss
+        if self.hparams.model_name in ['adm','mtl']:
+            loss, clf_loss, _ = self.compute_batch_loss(batch)
+            joint_loss=loss+clf_loss
+            self.log('train_loss',joint_loss)
+            self.log('train_clf_loss',clf_loss)
+            self.log('train_ppl',torch.exp(loss))
+            return joint_loss
+        else:
+            loss = self.compute_batch_loss(batch)
+            self.log('train_loss',loss)
+            self.log('train_ppl',torch.exp(loss))
+            return loss 
 
     def validation_step(self, batch, batch_idx):
-        val_loss = self.compute_batch_loss(batch)
-
-        self.log('val_loss',val_loss)
-        self.log('val_ppl',torch.exp(val_loss))
-        return val_loss
+        if self.hparams.model_name in ['adm','mtl']:
+            val_lm_loss, val_clf_loss, val_acc_1, val_acc_5= self.compute_batch_loss(batch)
+            val_joint_loss = val_lm_loss + val_clf_loss
+            self.log('val_loss',val_joint_loss)
+            self.log('val_ppl',torch.exp(val_lm_loss))
+            self.log('val_acc_1',val_acc_1)
+            self.log('val_acc_5',val_acc_5)
+            self.log('clf_loss',val_clf_loss)
+            return val_joint_loss
+        else:
+            loss = self.compute_batch_loss(batch)
+            self.log('val_loss',loss)
+            self.log('val_ppl',torch.exp(loss))
+            return loss  
 
     def configure_optimizers(self):
         cfg=dotdict(self.hparams.opt_cfg)
