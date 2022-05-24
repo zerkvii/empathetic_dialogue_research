@@ -4,6 +4,8 @@ from utils import dotdict
 DEFAULT_MODEL_CFG = dotdict({
     'n_ctx': 256,
     'n_embd': 768,
+    # elm model
+    'n_emo_embd':768,
     'n_head': 12,
     'n_layer': 12,
     'embd_pdrop': 0.1,
