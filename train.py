@@ -11,7 +11,7 @@ from optimizer import OpenAIAdam
 from configs import DEFAULT_MODEL_CFG, DEFAULT_OPT_CFG
 from model import ELMModel, LMModel, load_openai_pretrained_model
 from data_loader import load_dataset, load_dataset_ddp
-from utils import dotdict, make_infinite, stack_input, make_path, \
+from utils import cal_clf_acc, dotdict, make_infinite, stack_input, make_path, \
     get_time_str, Logger, delete_file, count_parameters, get_available_gpu
 from data_loader import load_dataset
 from utils import make_infinite, stack_input, make_path, \
@@ -47,7 +47,7 @@ class AFModel(LightningModule):
         # self.save_hyperparameters(ignore=['indexer'])
         if self.hparams.model_name=='trans':
             self.model = LMModel(dotdict(model_cfg), self.indexer.n_vocab, self.indexer.n_special, self.indexer.n_ctx)
-        elif self.hparams.model_name=='adde':
+        elif self.hparams.model_name in ['adde','adm']:
             self.model = ELMModel(dotdict(model_cfg),
                                   self.indexer.n_vocab, 
                                   self.indexer.n_special,
@@ -66,6 +66,8 @@ class AFModel(LightningModule):
             logits, _ = self.model(X)
         elif self.hparams.model_name=='adde':
             logits,_=self.model(batch['emotion'],X)
+        elif self.hparams.model_name=='adm':
+            logits, _, clf_logits = self.model(batch['clf_idx'], X)
         # mask = batch['dialog_mask'].to(device)
         mask = batch['dialog_mask']
         # calculate language modelling loss
@@ -77,6 +79,13 @@ class AFModel(LightningModule):
         mask_shifted = mask[:, 1:]
         loss = torch.sum(loss.view(mask_shifted.shape) *
                          mask_shifted) / torch.sum(mask_shifted)
+        if self.hparams.model_name == 'adm':
+            emo_label = batch['emotion']
+            clf_loss = F.cross_entropy(clf_logits, emo_label, reduction='mean')
+             # calculate emotion clf accuracy
+            acc_top1, acc_top5 = cal_clf_acc(clf_logits, emo_label.tolist())
+            joint_loss = loss + clf_loss
+            return joint_loss
         return loss
 
     def forward(self, x):

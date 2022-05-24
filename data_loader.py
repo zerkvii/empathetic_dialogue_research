@@ -7,6 +7,8 @@ import pickle
 import os
 from torch.utils.data.distributed import DistributedSampler
 
+from configs import EMOTION_CATES
+
 
 class Dataset(data.Dataset):
     def __init__(self, data, indexer, test=False):
@@ -68,6 +70,7 @@ class Dataset(data.Dataset):
                 item['context'] + item['target'], dtype=torch.long)
             item['dialog_state'] = torch.tensor(
                 item['context_state'] + item['target_state'], dtype=torch.long)
+        item['clf_idx'] = len(item['context']) - 1
         return item
 
     def filter_max_len(self, max_len, option):
@@ -118,12 +121,15 @@ def collate_fn(data, padding_idx):
 
     b = {}
     b['data'] = data
-    b['emotion'] = [d['emotion'] for d in data]
+    # b['emotion'] = [d['emotion'] for d in data]
+    b['emotion'] = torch.tensor([EMOTION_CATES.index(d['emotion']) for d in data], dtype=torch.long)
 
     dial_batch = [d['dialog'] for d in data]
     dial_state_batch = [d['dialog_state'] for d in data]
     b['dialog'], b['dialog_length'], b['dialog_mask'] = merge(dial_batch)
     b['dialog_state'], _, _ = merge(dial_state_batch)
+    # adm
+    b['clf_idx'] = torch.tensor([d['clf_idx'] for d in data], dtype=torch.long)
     return b
 
 
