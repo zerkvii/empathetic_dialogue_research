@@ -25,3 +25,38 @@ DEFAULT_OPT_CFG = dotdict({
     'b2': 0.999,
     'e': 1e-8
 })
+
+EMOTION_CATES = [
+    "surprised",
+    "excited",
+    "angry",
+    "proud",
+    "sad",
+    "annoyed",
+    "grateful",
+    "lonely",
+    "afraid",
+    "terrified",
+    "guilty",
+    "impressed",
+    "disgusted",
+    "hopeful",
+    "confident",
+    "furious",
+    "anxious",
+    "anticipating",
+    "joyful",
+    "nostalgic",
+    "disappointed",
+    "prepared",
+    "jealous",
+    "content",
+    "devastated",
+    "embarrassed",
+    "caring",
+    "sentimental",
+    "trusting",
+    "ashamed",
+    "apprehensive",
+    "faithful"
+]

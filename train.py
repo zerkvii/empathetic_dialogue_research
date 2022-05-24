@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 from optimizer import OpenAIAdam
 from configs import DEFAULT_MODEL_CFG, DEFAULT_OPT_CFG
-from model import LMModel, load_openai_pretrained_model
+from model import ELMModel, LMModel, load_openai_pretrained_model
 from data_loader import load_dataset, load_dataset_ddp
 from utils import dotdict, make_infinite, stack_input, make_path, \
     get_time_str, Logger, delete_file, count_parameters, get_available_gpu
@@ -27,7 +27,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 available_devices, devices = get_available_gpu()
 from typing import Dict
-os.environ['CUDA_VISIBLE_DEVICES'] = '9'
+os.environ['CUDA_VISIBLE_DEVICES'] = devices
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class AFModel(LightningModule):
@@ -35,6 +35,9 @@ class AFModel(LightningModule):
                  indexer:Indexer,
                  model_cfg:Dict,
                  opt_cfg:Dict,
+                 beta:float,
+                 init_std:float,
+                 tieSL:bool,
                  n_iter: int = 888,
                  ) -> None:
         super().__init__()
@@ -42,23 +45,35 @@ class AFModel(LightningModule):
         self.save_hyperparameters(ignore=['indexer'])
 
         # self.save_hyperparameters(ignore=['indexer'])
-        self.model = LMModel(dotdict(model_cfg), self.indexer.n_vocab, self.indexer.n_special, self.indexer.n_ctx)
-
+        if self.hparams.model_name=='trans':
+            self.model = LMModel(dotdict(model_cfg), self.indexer.n_vocab, self.indexer.n_special, self.indexer.n_ctx)
+        elif self.hparams.model_name=='adde':
+            self.model = ELMModel(dotdict(model_cfg),
+                                  self.indexer.n_vocab, 
+                                  self.indexer.n_special,
+                                  self.indexer.n_ctx,
+                                  self.indexer,
+                                  beta=beta,
+                                  init_std=init_std,
+                                  tieSL=tieSL
+                                  )
     def compute_batch_loss(self, batch):
         # stack token, dialog states and position encoding
         X = stack_input(batch['dialog'], [batch['dialog_state']], self.indexer)
         # X = X.to(device)
         # compute LM logits and loss
-        lm_logits, _ = self(X)
+        if self.hparams.model_name=='trans':
+            logits, _ = self.model(X)
+        elif self.hparams.model_name=='adde':
+            logits,_=self.model(batch['emotion'],X)
         # mask = batch['dialog_mask'].to(device)
         mask = batch['dialog_mask']
         # calculate language modelling loss
         target_shifted = X[:, 1:, 0].contiguous().view(-1)
-        lm_logits_shifted = lm_logits[:, :-1, :]
-        lm_logits_shifted = lm_logits_shifted.contiguous().view(-1,
-                                                                lm_logits.shape[-1])
+        logits_shifted = logits[:, :-1, :]
+        logits_shifted = logits_shifted.contiguous().view(-1,logits.shape[-1])
         loss = F.cross_entropy(
-            lm_logits_shifted, target_shifted, reduction='none')
+            logits_shifted, target_shifted, reduction='none')
         mask_shifted = mask[:, 1:]
         loss = torch.sum(loss.view(mask_shifted.shape) *
                          mask_shifted) / torch.sum(mask_shifted)
@@ -108,12 +123,10 @@ def parse_args():
     parser.add_argument('--n_epoch', type=int, default=3)
     parser.add_argument('--n_batch', type=int, default=8)
     parser.add_argument('--max_patience', type=int, default=3)
-    #do not use
-    parser.add_argument('--save_path', type=str, default='save/model')
     # other configs
     parser.add_argument('--dev', type=bool, default=False)
     parser.add_argument('--test', type=bool, default=False)
-    parser.add_argument('--model', type=str, default='LMModel')
+    parser.add_argument('--model_name', type=str, default='trans')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--no_pretrained', default=False, action='store_true')
     parser.add_argument('--pretrained_dir', type=str,
@@ -152,12 +165,14 @@ if __name__ == '__main__':
     tr_iter = make_infinite(data_loader_train)
     n_epoch = args.n_epoch
     n_iter = int(np.ceil(len(trainset) / batch_size)) * n_epoch
-
     # create and load pretrained model
-    model = AFModel(model_name='adde-lm',
+    model = AFModel(model_name=args.model_name,
                     indexer=indexer,
                     model_cfg=dict(model_cfg),
                     opt_cfg=dict(opt_cfg),
+                    beta=args.beta,
+                    init_std=args.init_std,
+                    tieSL=args.tieSL,
                     n_iter=n_iter,
                     )
     if not args.no_pretrained:
