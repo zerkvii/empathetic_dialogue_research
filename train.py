@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 from optimizer import OpenAIAdam
 from configs import DEFAULT_MODEL_CFG, DEFAULT_OPT_CFG
-from model import ELMModel, LMModel, load_openai_pretrained_model
+from model import AdmELM, ELMModel, LMModel, load_openai_pretrained_model
 from data_loader import load_dataset, load_dataset_ddp
 from utils import cal_clf_acc, dotdict, make_infinite, stack_input, make_path, \
     get_time_str, Logger, delete_file, count_parameters, get_available_gpu
@@ -47,7 +47,7 @@ class AFModel(LightningModule):
         # self.save_hyperparameters(ignore=['indexer'])
         if self.hparams.model_name=='trans':
             self.model = LMModel(dotdict(model_cfg), self.indexer.n_vocab, self.indexer.n_special, self.indexer.n_ctx)
-        elif self.hparams.model_name in ['adde','adm']:
+        elif self.hparams.model_name =='adde':
             self.model = ELMModel(dotdict(model_cfg),
                                   self.indexer.n_vocab, 
                                   self.indexer.n_special,
@@ -57,6 +57,16 @@ class AFModel(LightningModule):
                                   init_std=init_std,
                                   tieSL=tieSL
                                   )
+        elif self.hparams.model_name=='adm':
+           self.model = AdmELM(dotdict(model_cfg),
+                                  self.indexer.n_vocab, 
+                                  self.indexer.n_special,
+                                  self.indexer.n_ctx,
+                                  self.indexer,
+                                  beta=beta,
+                                  init_std=init_std,
+                                  tieSL=tieSL
+                                  ) 
     def compute_batch_loss(self, batch):
         # stack token, dialog states and position encoding
         X = stack_input(batch['dialog'], [batch['dialog_state']], self.indexer)
