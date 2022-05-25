@@ -224,7 +224,7 @@ if __name__ == '__main__':
 
     trainer=Trainer
     checkpoint_callback = ModelCheckpoint(
-        monitor="val_ppl", filename=f"adde_model", mode="min")
+        monitor="val_ppl", filename=f"{args.model_name}", mode="min")
     trainer = Trainer(max_epochs=n_epoch,
                       accelerator="gpu",
                       devices=available_devices,
