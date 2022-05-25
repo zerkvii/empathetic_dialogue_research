@@ -35,5 +35,16 @@ class Indexer:
             return '[SOS]'
         elif idx == self.EOS_IDX:
             return '[EOS]'
+        elif idx==self.DS_PREP_IDX:
+            return '</pre_emo>'
+        elif idx==self.DS_LISTENER_IDX:
+            return '</listener>'
+        elif idx==self.DS_SPEAKER_IDX:
+            return'</speaker>'
         else:
             return self.text_encoder.decoder[idx]
+    def decode_text_sequence(self,id_seq_tensor):
+        seq_lis=[]
+        for idx in id_seq_tensor:
+            seq_lis.append(self.decode_index2text(idx.item()))
+        return ' '.join(seq_lis).replace('</w>','')

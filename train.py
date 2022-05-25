@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 from optimizer import OpenAIAdam
 from configs import DEFAULT_MODEL_CFG, DEFAULT_OPT_CFG
 from model import AdmELM, ELMModel, LMModel, MtlELM, load_openai_pretrained_model
-from data_loader import load_dataset, load_dataset_ddp
+from data_loader import load_dataset 
 from utils import cal_clf_acc, dotdict, make_infinite, stack_input, make_path, \
     get_time_str, Logger, delete_file, count_parameters, get_available_gpu
 from data_loader import load_dataset
@@ -73,6 +73,7 @@ class AFModel(LightningModule):
         # stack token, dialog states and position encoding
         X = stack_input(batch['dialog'], [batch['dialog_state']], self.indexer)
         # X = X.to(device)
+        
         # compute LM logits and loss
         if self.hparams.model_name=='trans':
             logits, _ = self.model(X)
@@ -105,6 +106,10 @@ class AFModel(LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
+        #test batch
+        # if batch_idx%20==0:
+            # print(self.indexer.decode_text_sequence(batch['dialog'][0]))
+            # print(self.indexer.decode_text_sequence(batch['dialog_state'][0]))
         if self.hparams.model_name in ['adm','mtl']:
             loss, clf_loss, _ = self.compute_batch_loss(batch)
             joint_loss=loss+clf_loss
@@ -222,7 +227,6 @@ if __name__ == '__main__':
 
     #################### training ####################
 
-    trainer=Trainer
     checkpoint_callback = ModelCheckpoint(
         monitor="val_ppl", filename=f"{args.model_name}", mode="min")
     trainer = Trainer(max_epochs=n_epoch,
