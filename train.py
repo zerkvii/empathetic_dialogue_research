@@ -125,7 +125,7 @@ class AFModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         if self.hparams.model_name in ['adm','mtl']:
-            val_lm_loss, val_clf_loss, val_acc_1, val_acc_5= self.compute_batch_loss(batch)
+            val_lm_loss, val_clf_loss, (val_acc_1, val_acc_5)= self.compute_batch_loss(batch)
             val_joint_loss = val_lm_loss + val_clf_loss
             self.log('val_loss',val_joint_loss)
             self.log('val_ppl',torch.exp(val_lm_loss))
