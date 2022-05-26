@@ -63,3 +63,12 @@ EMOTION_CATES = [
     "apprehensive",
     "faithful"
 ]
+
+DEFAULT_GEN_CONFIG=dotdict({
+    'max_gen_len':50,
+    'beam_size':5,
+    'dbs_beam_size':1,
+    'dbs_groups':5,
+    'dbs_lambda':0.5,
+    'gen_log_dir':'beam_log/'
+})
